@@ -55,9 +55,66 @@ body {
   gap: 12px;
 }
 
+  max-width: 80%;
+  word-wrap: break-word;
 .message {
   max-width: 80%;
   word-wrap: break-word;
+  position: relative;
+}
+
+.message-label {
+  font-size: 0.85em;
+  color: #666;
+  margin-bottom: 2px;
+  font-weight: 500;
+}
+
+.username-prompt {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+}
+
+#usernameInput {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 1em;
+}
+
+#usernameBtn {
+  padding: 8px 18px;
+  border-radius: 8px;
+  background: #667eea;
+  color: #fff;
+  border: none;
+  font-size: 1em;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+#usernameBtn:hover {
+  background: #764ba2;
+}
+
+#sendBtn {
+  padding: 8px 18px;
+  border-radius: 8px;
+  background: #667eea;
+  color: #fff;
+  border: none;
+  font-size: 1em;
+  cursor: pointer;
+  margin-left: 8px;
+  transition: background 0.2s;
+}
+#sendBtn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
   animation: fadeIn 0.3s ease-in;
 }
 

@@ -22,9 +22,10 @@ const waitingQueue = [];
 const activeChats = new Map();
 
 class User {
-    constructor(ws) {
+    constructor(ws, username = null) {
         this.id = uuidv4();
         this.ws = ws;
+        this.username = username;
         this.partnerId = null;
         this.chatId = null;
         this.isWaiting = false;
@@ -144,9 +145,16 @@ function broadcastMessage(chatId, senderId, message) {
     const chat = activeChats.get(chatId);
     if (!chat) return;
 
+    const sender = users.get(senderId);
+    const partnerId = chat.user1Id === senderId ? chat.user2Id : chat.user1Id;
+    const partner = users.get(partnerId);
+
     const messageObj = {
         id: uuidv4(),
         senderId,
+        senderName: sender ? sender.username : 'User',
+        partnerId,
+        partnerName: partner ? partner.username : 'User',
         message,
         timestamp: new Date()
     };
@@ -162,6 +170,9 @@ function broadcastMessage(chatId, senderId, message) {
                 chatId,
                 messageId: messageObj.id,
                 senderId,
+                senderName: messageObj.senderName,
+                partnerId: messageObj.partnerId,
+                partnerName: messageObj.partnerName,
                 message,
                 timestamp: messageObj.timestamp,
                 isOwn: userId === senderId
@@ -171,21 +182,33 @@ function broadcastMessage(chatId, senderId, message) {
 }
 
 wss.on('connection', (ws) => {
-    const user = new User(ws);
-    users.set(user.id, user);
-
-    console.log(`User ${user.id} connected. Total users: ${users.size}`);
-
-    // Send welcome message
-    ws.send(JSON.stringify({
-        type: 'connected',
-        userId: user.id,
-        message: 'Connected to AnoConnect'
-    }));
+    let user = null;
 
     ws.on('message', (data) => {
         try {
             const message = JSON.parse(data.toString());
+
+            // First message should be username
+            if (!user && message.type === 'set_username' && message.username) {
+                user = new User(ws, message.username);
+                users.set(user.id, user);
+                console.log(`User ${user.id} (${user.username}) connected. Total users: ${users.size}`);
+                ws.send(JSON.stringify({
+                    type: 'connected',
+                    userId: user.id,
+                    username: user.username,
+                    message: 'Connected to AnoConnect'
+                }));
+                return;
+            }
+
+            if (!user) {
+                ws.send(JSON.stringify({
+                    type: 'error',
+                    message: 'Username required.'
+                }));
+                return;
+            }
 
             switch (message.type) {
                 case 'find_partner':
@@ -216,16 +239,20 @@ wss.on('connection', (ws) => {
     });
 
     ws.on('close', () => {
-        console.log(`User ${user.id} disconnected`);
-        endChat(user.id);
-        users.delete(user.id);
-        console.log(`Total users: ${users.size}`);
+        if (user) {
+            console.log(`User ${user.id} (${user.username}) disconnected`);
+            endChat(user.id);
+            users.delete(user.id);
+            console.log(`Total users: ${users.size}`);
+        }
     });
 
     ws.on('error', (error) => {
-        console.error('WebSocket error:', error);
-        endChat(user.id);
-        users.delete(user.id);
+        if (user) {
+            console.error('WebSocket error:', error);
+            endChat(user.id);
+            users.delete(user.id);
+        }
     });
 });
 

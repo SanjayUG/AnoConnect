@@ -2,22 +2,28 @@ class AnoConnect {
     constructor() {
         this.ws = null;
         this.userId = null;
+        this.username = null;
         this.chatId = null;
         this.partnerId = null;
+        this.partnerName = null;
         this.isConnected = false;
         this.isInChat = false;
 
         this.initElements();
         this.bindEvents();
-        this.connect();
+        this.showUsernamePrompt();
     }
 
     initElements() {
         this.statusDiv = document.getElementById('status');
         this.chatWindow = document.getElementById('chat-window');
         this.messageInput = document.getElementById('messageInput');
+        this.sendBtn = document.getElementById('sendBtn');
         this.newChatBtn = document.getElementById('newChatBtn');
         this.endChatBtn = document.getElementById('endChatBtn');
+        this.usernamePrompt = document.getElementById('username-prompt');
+        this.usernameInput = document.getElementById('usernameInput');
+        this.usernameBtn = document.getElementById('usernameBtn');
     }
 
     bindEvents() {
@@ -27,23 +33,59 @@ class AnoConnect {
                 this.messageInput.value = '';
             }
         });
-
+        this.sendBtn.addEventListener('click', () => {
+            if (this.messageInput.value.trim() && this.isInChat) {
+                this.sendMessage(this.messageInput.value.trim());
+                this.messageInput.value = '';
+            }
+        });
         this.newChatBtn.addEventListener('click', () => {
             this.findNewChat();
         });
-
         this.endChatBtn.addEventListener('click', () => {
             this.endChat();
         });
+        this.usernameBtn.addEventListener('click', () => {
+            this.submitUsername();
+        });
+        this.usernameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                this.submitUsername();
+            }
+        });
+    }
+
+    showUsernamePrompt() {
+        this.usernamePrompt.style.display = 'block';
+        this.chatWindow.style.display = 'none';
+        this.messageInput.disabled = true;
+        this.sendBtn.disabled = true;
+        this.newChatBtn.disabled = true;
+        this.endChatBtn.disabled = true;
+        this.usernameInput.focus();
+    }
+
+    submitUsername() {
+        const username = this.usernameInput.value.trim();
+        if (!username) {
+            this.statusDiv.textContent = 'Please enter a username.';
+            return;
+        }
+        this.username = username;
+        this.usernamePrompt.style.display = 'none';
+        this.chatWindow.style.display = 'flex';
+        this.connect();
     }
 
     connect() {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}`;
-        
         this.ws = new WebSocket(wsUrl);
 
         this.ws.onopen = () => {
+            if (this.username) {
+                this.ws.send(JSON.stringify({ type: 'set_username', username: this.username }));
+            }
             console.log('Connected to server');
             this.isConnected = true;
             this.updateStatus('Connected! Click "New Chat" to start chatting.');
@@ -60,7 +102,6 @@ class AnoConnect {
             this.isConnected = false;
             this.updateStatus('Disconnected. Trying to reconnect...');
             this.disableControls();
-            
             // Try to reconnect after 3 seconds
             setTimeout(() => {
                 if (!this.isConnected) {
@@ -79,6 +120,7 @@ class AnoConnect {
         switch (data.type) {
             case 'connected':
                 this.userId = data.userId;
+                this.username = data.username;
                 break;
 
             case 'waiting':
@@ -92,20 +134,22 @@ class AnoConnect {
                 this.chatId = data.chatId;
                 this.partnerId = data.partnerId;
                 this.isInChat = true;
-                this.updateStatus('Connected to stranger! Start chatting...');
+                this.updateStatus('Connected! Start chatting...');
                 this.enableChat();
-                this.addSystemMessage('You are now connected to a stranger. Say hi!');
+                this.addSystemMessage('You are now connected. Say hi!');
                 break;
 
             case 'message':
-                this.displayMessage(data.message, data.isOwn, data.timestamp);
+                this.partnerName = data.isOwn ? data.partnerName : data.senderName;
+                this.displayMessage(data.message, data.isOwn, data.timestamp, data.senderName, data.partnerName);
                 break;
 
             case 'chat_ended':
                 this.isInChat = false;
                 this.chatId = null;
                 this.partnerId = null;
-                this.updateStatus('Chat ended. Click "New Chat" to find another stranger.');
+                this.partnerName = null;
+                this.updateStatus('Chat ended. Click "New Chat" to find another user.');
                 this.disableChat();
                 this.addSystemMessage(data.message);
                 break;
@@ -151,20 +195,16 @@ class AnoConnect {
         this.addSystemMessage('You have ended the chat.');
     }
 
-    displayMessage(message, isOwn, timestamp) {
+    displayMessage(message, isOwn, timestamp, senderName, partnerName) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${isOwn ? 'own' : 'other'}`;
-        
-        const time = new Date(timestamp).toLocaleTimeString([], { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-        });
-        
+        const time = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const userLabel = isOwn ? `You (${senderName || this.username})` : `User (${senderName || partnerName || 'User'})`;
         messageDiv.innerHTML = `
+            <div class="message-label">${userLabel}</div>
             <div class="message-bubble">${this.escapeHtml(message)}</div>
             <div class="message-time">${time}</div>
         `;
-        
         this.chatWindow.appendChild(messageDiv);
         this.scrollToBottom();
     }
@@ -187,7 +227,8 @@ class AnoConnect {
 
     enableChat() {
         this.messageInput.disabled = false;
-        this.messageInput.placeholder = 'Type your message and press Enter...';
+        this.sendBtn.disabled = false;
+        this.messageInput.placeholder = 'Type your message...';
         this.newChatBtn.disabled = false;
         this.endChatBtn.disabled = false;
         this.messageInput.focus();
@@ -195,6 +236,7 @@ class AnoConnect {
 
     disableChat() {
         this.messageInput.disabled = true;
+        this.sendBtn.disabled = true;
         this.messageInput.placeholder = 'Click "New Chat" to start chatting...';
         this.newChatBtn.disabled = false;
         this.endChatBtn.disabled = true;
