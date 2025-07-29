@@ -11,14 +11,20 @@
     "test": "echo 'No tests specified'"
   },
   "dependencies": {
-    "ws": "^8.14.2",
+    "dotenv": "^17.2.1",
     "express": "^4.18.2",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "ws": "^8.14.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
   },
-  "keywords": ["chat", "websocket", "omegle", "random"],
+  "keywords": [
+    "chat",
+    "websocket",
+    "omegle",
+    "random"
+  ],
   "author": "Your Name",
   "license": "MIT"
 }
